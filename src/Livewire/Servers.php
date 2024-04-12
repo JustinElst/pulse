@@ -23,11 +23,11 @@ class Servers extends Card
     {
         [$servers, $time, $runAt] = $this->remember(function () {
             $graphs = $this->graph(['cpu', 'memory'], 'avg');
+            $ignoreAfter = Config::get('pulse.recorders.'.ServersRecorder::class . '.ignore_after');
 
             return $this->values('system')
-                ->map(function ($system, $slug) use ($graphs) {
+                ->map(function ($system, $slug) use ($graphs, $ignoreAfter) {
                     $values = json_decode($system->value, flags: JSON_THROW_ON_ERROR);
-                    $ignoreAfter = Config::get('pulse.recorders.'.ServersRecorder::class . '.ignore_after');
                     if (is_int($ignoreAfter) && !CarbonImmutable::createFromTimestamp($system->timestamp)->isAfter(now()->subSeconds(30)->subMinutes($ignoreAfter))) {
                         //instead of returning null, we remove the value from the list
                         return null;
