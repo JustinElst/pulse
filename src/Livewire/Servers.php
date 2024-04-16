@@ -28,8 +28,8 @@ class Servers extends Card
             return $this->values('system')
                 ->map(function ($system, $slug) use ($graphs, $ignoreAfter) {
                     $values = json_decode($system->value, flags: JSON_THROW_ON_ERROR);
-                    if (is_int($ignoreAfter) && !CarbonImmutable::createFromTimestamp($system->timestamp)->isAfter(now()->subSeconds(30)->subMinutes($ignoreAfter))) {
-                        //instead of returning null, we remove the value from the list
+
+                    if (is_int($ignoreAfter) && CarbonImmutable::createFromTimestamp($system->timestamp)->isBefore(now()->subSeconds($ignoreAfter))) {
                         return null;
                     }
 
