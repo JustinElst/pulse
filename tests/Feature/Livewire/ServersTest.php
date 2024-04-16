@@ -2,8 +2,10 @@
 
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Config;
 use Laravel\Pulse\Facades\Pulse;
 use Laravel\Pulse\Livewire\Servers;
+use Laravel\Pulse\Recorders\Servers as ServersRecorder;
 use Livewire\Livewire;
 
 it('includes the card on the dashboard', function () {
@@ -86,4 +88,39 @@ it('sorts by server name', function () {
 
     Livewire::test(Servers::class, ['lazy' => false])
         ->assertSeeInOrder(['A Web', 'B Web', 'C Web']);
+});
+
+it('can ignore servers that have stopped reporting', function () {
+    Carbon::setTestNow(now()->startOfSecond());
+    Config::set('pulse.recorders.'.ServersRecorder::class.'.ignore_after', 600);
+
+    $data = [
+        'memory_used' => 1234,
+        'memory_total' => 2468,
+        'cpu' => 99,
+        'storage' => [
+            ['directory' => '/', 'used' => 123, 'total' => 456],
+        ],
+    ];
+
+    Pulse::set('system', 'server-1', json_encode([
+        'name' => 'Server 1',
+        ...$data,
+    ]), now()->subSeconds(599));
+
+    Pulse::set('system', 'server-2', json_encode([
+        'name' => 'Server 2',
+        ...$data,
+    ]), now()->subSeconds(601));
+
+    Pulse::set('system', 'server-3', json_encode([
+        'name' => 'Server 3',
+        ...$data,
+    ]), now()->subSeconds(600));
+
+    Pulse::ingest();
+
+    Livewire::test(Servers::class, ['lazy' => false])
+        ->assertSeeTextInOrder(['Server 1', 'Server 3'])
+        ->assertDontSeeText('Server 2');
 });
