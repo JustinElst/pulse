@@ -3,12 +3,11 @@
 namespace Laravel\Pulse\Livewire;
 
 use Carbon\CarbonImmutable;
+use Carbon\CarbonInterval;
 use Illuminate\Contracts\Support\Renderable;
 use Illuminate\Support\Facades\View;
 use Livewire\Attributes\Lazy;
 use Livewire\Livewire;
-use Illuminate\Support\Facades\Config;
-use Laravel\Pulse\Recorders\Servers as ServersRecorder;
 
 /**
  * @internal
@@ -16,6 +15,19 @@ use Laravel\Pulse\Recorders\Servers as ServersRecorder;
 #[Lazy]
 class Servers extends Card
 {
+    public int|string|null $ignoreAfter = null;
+
+    /**
+     * Get the ignore after seconds from the ignoreAfter property.
+     */
+    protected function getIgnoreAfterSeconds(): int|null
+    {
+        if (is_string($this->ignoreAfter)) {
+            return CarbonInterval::make($this->ignoreAfter)->totalSeconds;
+        }
+        return is_int($this->ignoreAfter) ? $this->ignoreAfter : null;
+    }
+
     /**
      * Render the component.
      */
@@ -23,7 +35,7 @@ class Servers extends Card
     {
         [$servers, $time, $runAt] = $this->remember(function () {
             $graphs = $this->graph(['cpu', 'memory'], 'avg');
-            $ignoreAfter = Config::get('pulse.recorders.'.ServersRecorder::class . '.ignore_after');
+            $ignoreAfter = $this->getIgnoreAfterSeconds();
 
             return $this->values('system')
                 ->map(function ($system, $slug) use ($graphs, $ignoreAfter) {

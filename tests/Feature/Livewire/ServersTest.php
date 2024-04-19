@@ -2,10 +2,8 @@
 
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Config;
 use Laravel\Pulse\Facades\Pulse;
 use Laravel\Pulse\Livewire\Servers;
-use Laravel\Pulse\Recorders\Servers as ServersRecorder;
 use Livewire\Livewire;
 
 it('includes the card on the dashboard', function () {
@@ -92,7 +90,6 @@ it('sorts by server name', function () {
 
 it('can ignore servers that have stopped reporting', function () {
     Carbon::setTestNow(now()->startOfSecond());
-    Config::set('pulse.recorders.'.ServersRecorder::class.'.ignore_after', 600);
 
     $data = [
         'memory_used' => 1234,
@@ -120,7 +117,11 @@ it('can ignore servers that have stopped reporting', function () {
 
     Pulse::ingest();
 
-    Livewire::test(Servers::class, ['lazy' => false])
+    Livewire::test(Servers::class, ['lazy' => false, 'ignoreAfter' => 600])
+        ->assertSeeTextInOrder(['Server 1', 'Server 3'])
+        ->assertDontSeeText('Server 2');
+
+    Livewire::test(Servers::class, ['lazy' => false, 'ignoreAfter' => '10 minutes'])
         ->assertSeeTextInOrder(['Server 1', 'Server 3'])
         ->assertDontSeeText('Server 2');
 });
