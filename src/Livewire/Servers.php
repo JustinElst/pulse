@@ -4,6 +4,7 @@ namespace Laravel\Pulse\Livewire;
 
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterval;
+use Carbon\Exceptions\InvalidFormatException;
 use Illuminate\Contracts\Support\Renderable;
 use Illuminate\Support\Facades\View;
 use Livewire\Attributes\Lazy;
@@ -20,10 +21,10 @@ class Servers extends Card
     /**
      * Get the ignore after seconds from the ignoreAfter property.
      */
-    protected function getIgnoreAfterSeconds(): int|null
+    protected function getIgnoreAfterSeconds(): int|float|null
     {
         if (is_string($this->ignoreAfter)) {
-            return CarbonInterval::make($this->ignoreAfter)->totalSeconds;
+            return CarbonInterval::make($this->ignoreAfter)?->totalSeconds ?? null;
         }
         return is_int($this->ignoreAfter) ? $this->ignoreAfter : null;
     }
@@ -41,7 +42,7 @@ class Servers extends Card
                 ->map(function ($system, $slug) use ($graphs, $ignoreAfter) {
                     $values = json_decode($system->value, flags: JSON_THROW_ON_ERROR);
 
-                    if (is_int($ignoreAfter) && CarbonImmutable::createFromTimestamp($system->timestamp)->isBefore(now()->subSeconds($ignoreAfter))) {
+                    if (is_numeric($ignoreAfter) && CarbonImmutable::createFromTimestamp($system->timestamp)->isBefore(now()->subSeconds($ignoreAfter))) {
                         return null;
                     }
 
