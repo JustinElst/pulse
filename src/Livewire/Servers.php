@@ -4,9 +4,9 @@ namespace Laravel\Pulse\Livewire;
 
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterval;
-use Carbon\Exceptions\InvalidFormatException;
 use Illuminate\Contracts\Support\Renderable;
 use Illuminate\Support\Facades\View;
+use Illuminate\Support\InteractsWithTime;
 use Livewire\Attributes\Lazy;
 use Livewire\Livewire;
 
@@ -16,18 +16,9 @@ use Livewire\Livewire;
 #[Lazy]
 class Servers extends Card
 {
-    public int|string|null $ignoreAfter = null;
+    use InteractsWithTime;
 
-    /**
-     * Get the ignore after seconds from the ignoreAfter property.
-     */
-    protected function getIgnoreAfterSeconds(): int|float|null
-    {
-        if (is_string($this->ignoreAfter)) {
-            return CarbonInterval::make($this->ignoreAfter)?->totalSeconds ?? null;
-        }
-        return is_int($this->ignoreAfter) ? $this->ignoreAfter : null;
-    }
+    public int|string|null $ignoreAfter = null;
 
     /**
      * Render the component.
@@ -36,15 +27,14 @@ class Servers extends Card
     {
         [$servers, $time, $runAt] = $this->remember(function () {
             $graphs = $this->graph(['cpu', 'memory'], 'avg');
-            $ignoreAfter = $this->getIgnoreAfterSeconds();
 
             return $this->values('system')
-                ->map(function ($system, $slug) use ($graphs, $ignoreAfter) {
-                    $values = json_decode($system->value, flags: JSON_THROW_ON_ERROR);
-
-                    if (is_numeric($ignoreAfter) && CarbonImmutable::createFromTimestamp($system->timestamp)->isBefore(now()->subSeconds($ignoreAfter))) {
+                ->map(function ($system, $slug) use ($graphs) {
+                    if ($this->ignoreSystem($system)) {
                         return null;
                     }
+
+                    $values = json_decode($system->value, flags: JSON_THROW_ON_ERROR);
 
                     return (object) [
                         'name' => (string) $values->name,
@@ -79,5 +69,23 @@ class Servers extends Card
     public function placeholder(): Renderable
     {
         return View::make('pulse::components.servers-placeholder', ['cols' => $this->cols, 'rows' => $this->rows, 'class' => $this->class]);
+    }
+
+    /**
+     * Determine if the system should be ignored.
+     *
+     * @param  object{ timestamp: int, key: string, value: string }  $system
+     */
+    protected function ignoreSystem(object $system): bool
+    {
+        if ($this->ignoreAfter === null) {
+            return false;
+        }
+
+        $ignoreAfter = is_numeric($this->ignoreAfter)
+            ? (int) $this->ignoreAfter
+            : CarbonInterval::createFromDateString($this->ignoreAfter)->totalSeconds;
+
+        return CarbonImmutable::createFromTimestamp($system->timestamp)->addSeconds($ignoreAfter)->isPast();
     }
 }

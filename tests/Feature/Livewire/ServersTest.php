@@ -88,7 +88,7 @@ it('sorts by server name', function () {
         ->assertSeeInOrder(['A Web', 'B Web', 'C Web']);
 });
 
-it('can ignore servers that have stopped reporting', function () {
+it('can ignore servers that have stopped reporting', function ($ignoreAfter, $see, $dontSee) {
     Carbon::setTestNow(now()->startOfSecond());
 
     $data = [
@@ -108,20 +108,30 @@ it('can ignore servers that have stopped reporting', function () {
     Pulse::set('system', 'server-2', json_encode([
         'name' => 'Server 2',
         ...$data,
-    ]), now()->subSeconds(601));
+    ]), now()->subSeconds(600));
 
     Pulse::set('system', 'server-3', json_encode([
         'name' => 'Server 3',
         ...$data,
-    ]), now()->subSeconds(600));
+    ]), now()->subSeconds(601));
 
     Pulse::ingest();
 
-    Livewire::test(Servers::class, ['lazy' => false, 'ignoreAfter' => 600])
-        ->assertSeeTextInOrder(['Server 1', 'Server 3'])
-        ->assertDontSeeText('Server 2');
-
-    Livewire::test(Servers::class, ['lazy' => false, 'ignoreAfter' => '10 minutes'])
-        ->assertSeeTextInOrder(['Server 1', 'Server 3'])
-        ->assertDontSeeText('Server 2');
-});
+    Livewire::test(Servers::class, ['lazy' => false, 'ignoreAfter' => value($ignoreAfter)])
+        ->assertSeeInOrder($see)
+        ->assertDontSeeText($dontSee);
+})->with([
+    [null, ['Server 1', 'Server 2', 'Server 3'], []],
+    [588, [], ['Server 1', 'Server 2', 'Server 3']],
+    [599, ['Server 1'], ['Server 2', 'Server 3']],
+    [600, ['Server 1', 'Server 2'], ['Server 3']],
+    [601, ['Server 1', 'Server 2', 'Server 3'], []],
+    ['588', [], ['Server 1', 'Server 2', 'Server 3']],
+    ['599', ['Server 1'], ['Server 2', 'Server 3']],
+    ['600', ['Server 1', 'Server 2'], ['Server 3']],
+    ['601', ['Server 1', 'Server 2', 'Server 3'], []],
+    ['588 seconds', [], ['Server 1', 'Server 2', 'Server 3']],
+    ['599 seconds', ['Server 1'], ['Server 2', 'Server 3']],
+    ['600 seconds', ['Server 1', 'Server 2'], ['Server 3']],
+    ['601 seconds', ['Server 1', 'Server 2', 'Server 3'], []],
+]);
